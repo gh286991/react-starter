@@ -1,0 +1,213 @@
+#!/bin/bash
+
+if [ -z "$1" ]; then
+  echo "Please provide a project name."
+  exit 1
+fi
+
+PROJECT_NAME=$1
+
+mkdir $PROJECT_NAME
+cd $PROJECT_NAME
+yarn init -y
+
+# Add scripts to package.json using Node.js
+node -e "const fs = require('fs'); const packageJson = JSON.parse(fs.readFileSync('package.json')); packageJson.scripts = { start: 'webpack serve --mode development', build: 'webpack --mode production', test: 'jest' }; fs.writeFileSync('package.json', JSON.stringify(packageJson, null, 2));"
+
+yarn add react@18.2.0 react-dom@18.2.0
+yarn add --dev typescript ts-loader webpack webpack-cli webpack-dev-server html-webpack-plugin @types/react @types/react-dom sass-loader sass style-loader css-loader
+yarn add --dev jest @types/jest ts-jest react-testing-library @testing-library/react @testing-library/jest-dom @testing-library/user-event jest-environment-jsdom
+yarn add --dev eslint eslint-plugin-react @typescript-eslint/parser @typescript-eslint/eslint-plugin eslint-plugin-react-hooks eslint-config-airbnb-typescript eslint-plugin-jest
+yarn add --dev fork-ts-checker-webpack-plugin
+
+cat > tsconfig.json << EOL
+{
+  "compilerOptions": {
+    "target": "es5",
+    "module": "commonjs",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "allowJs": true,
+    "jsx": "react-jsx",
+    "sourceMap": true,
+    "strict": true,
+    "moduleResolution": "node",
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "types": [
+      "node",
+      "jest"
+    ]
+  },
+  "include": ["src"]
+}
+EOL
+
+cat > webpack.config.js << EOL
+const HtmlWebpackPlugin = require('html-webpack-plugin');
+const ForkTsCheckerWebpackPlugin = require('fork-ts-checker-webpack-plugin');
+
+module.exports = {
+  entry: './src/index.tsx',
+  output: {
+    path: __dirname + '/dist',
+    filename: 'bundle.js',
+  },
+  resolve: {
+    extensions: ['.ts', '.tsx', '.js'],
+  },
+  module: {
+    rules: [
+      {
+        test: /\.tsx?$/,
+        loader: 'ts-loader',
+      },
+      {
+        test: /\.scss$/,
+        use: ['style-loader', 'css-loader', 'sass-loader'],
+      },
+    ],
+  },
+  plugins: [
+    new HtmlWebpackPlugin({
+      template: './src/index.html',
+    }),
+    new ForkTsCheckerWebpackPlugin({
+      typescript: {
+        diagnosticOptions: {
+          semantic: true,
+          syntactic: true,
+        },
+      },
+    }),
+  ],
+  devServer: {
+    static: {
+      directory: __dirname + '/dist',
+    },
+    compress: true,
+    port: 4800,
+  },
+};
+EOL
+
+mkdir src
+
+cat > src/index.html << EOL
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>React 18 with Webpack and TypeScript</title>
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>
+EOL
+
+
+cat > src/index.tsx << EOL
+import React from 'react';
+import ReactDOM from 'react-dom';
+import App from './App';
+
+// Import styles
+import './styles.scss';
+
+ReactDOM.render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>,
+  document.getElementById('root')
+);
+EOL
+
+cat > src/App.tsx << EOL
+import React from 'react';
+
+const App: React.FC = () => {
+  return (
+    <div>
+      <h1>Hello, React 18 with Webpack and TypeScript!</h1>
+    </div>
+  );
+};
+
+export default App;
+EOL
+
+cat > jest.config.js << EOL
+module.exports = {
+  preset: 'ts-jest',
+  testEnvironment: 'jest-environment-jsdom',
+  setupFilesAfterEnv: ['@testing-library/jest-dom/extend-expect'],
+};
+EOL
+
+cat > src/__test__/App.test.tsx << EOL
+import React from 'react';
+import { render, screen } from '@testing-library/react';
+import App from './App';
+
+test('renders greeting', () => {
+  render(<App />);
+  const greetingElement = screen.getByText(/hello, react 18 with webpack and typescript!/i);
+  expect(greetingElement).toBeInTheDocument();
+});
+EOL
+
+cat > src/styles.scss << EOL
+body {
+  background-color: lightblue;
+}
+EOL
+
+
+cat > .eslintrc.json << EOL
+{
+  "parser": "@typescript-eslint/parser",
+  "extends": [
+    "airbnb-typescript",
+    "plugin:react/recommended",
+    "plugin:@typescript-eslint/recommended",
+    "plugin:react-hooks/recommended",
+    "plugin:jest/recommended"
+  ],
+  "plugins": [
+    "react",
+    "@typescript-eslint",
+    "react-hooks",
+    "jest"
+  ],
+  "parserOptions": {
+    "project": "./tsconfig.json",
+    "ecmaVersion": 2020,
+    "sourceType": "module",
+    "ecmaFeatures": {
+      "jsx": true
+    }
+  },
+  "settings": {
+    "react": {
+      "version": "detect"
+    }
+  },
+  "rules": {
+    "react/jsx-filename-extension": [1, { "extensions": [".tsx", ".jsx"] }],
+    "react/react-in-jsx-scope": "off",
+    "react/jsx-indent": [2, 2],
+    "react/jsx-indent-props": [2, 2],
+    "@typescript-eslint/indent": [2, 2],
+    "react-hooks/rules-of-hooks": "error",
+    "react-hooks/exhaustive-deps": "warn",
+    "no-multiple-empty-lines": ["error", { "max": 1, "maxEOF": 1, "maxBOF": 0 }],
+    "import/extensions": 0
+  },
+  "env": {
+    "jest/globals": true
+  }
+}
+
+EOL
